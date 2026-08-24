@@ -209,6 +209,12 @@ public class Room: IServerMessaging {
 
         Console.WriteLine("Removing Game");
 
+        game.closeCalled = true;
+        game.socket.Dispose();
+        Console.WriteLine("Game Socket Disposed");
+
+        clientUpdateSemaphore.Release();
+
         Console.WriteLine(game.socket.State);
         switch (game.socket.State) {
             case WebSocketState.Connecting:
@@ -230,12 +236,6 @@ public class Room: IServerMessaging {
             default:
                 break;
         }
-
-        game.closeCalled = true;
-        game.socket.Dispose();
-        Console.WriteLine("Game Socket Disposed");
-
-        clientUpdateSemaphore.Release();
 
         Console.WriteLine();
         return true;
@@ -348,6 +348,14 @@ public class Room: IServerMessaging {
             return true;
         }
 
+        client.closeCalled = true;
+        client.socket.Dispose();
+        Console.WriteLine($"Room {Id}: {clientName} Socket Disposed");
+
+        clientCount = Math.Max(clientCount - 1, 0);
+
+        clientUpdateSemaphore.Release();
+
         Console.WriteLine(client.socket.State);
         switch (client.socket.State) {
             case WebSocketState.Connecting:
@@ -371,14 +379,6 @@ public class Room: IServerMessaging {
                 // Closed, None, CloseSent, and Aborted all don't require any further action
                 break;
         }
-
-        client.closeCalled = true;
-        client.socket.Dispose();
-        Console.WriteLine($"Room {Id}: {clientName} Socket Disposed");
-
-        clientCount = Math.Max(clientCount - 1, 0);
-
-        clientUpdateSemaphore.Release();
 
         Console.WriteLine();
         return success;
@@ -471,7 +471,7 @@ public class Room: IServerMessaging {
             ArraySegment<byte> usedBuffer = new ArraySegment<byte>(messageBuffer, 0, messageByteCount);
 
             Message message = messenger.DecodeBinaryToMessage(usedBuffer);
-            messageHandler.HandleMessage(message, this);
+            await messageHandler.HandleMessage(message, this);
 
             if (!gameNotPlayer && game.socket.State == WebSocketState.Open) {
                 await game.socket.SendAsync(usedBuffer, WebSocketMessageType.Binary, true, game.cancelToken);
