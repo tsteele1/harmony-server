@@ -11,7 +11,7 @@ namespace Harmony {
  * "Game": A single host client to connect to.
  * "Player": Any number of non-host clients connecting.
 */
-public class Room: IServerMessaging {
+public class Room: IServerMessaging, IDisposable {
     public struct Client {
         public WebSocket socket;               // Our Room's connection to the Client.
         public CancellationToken cancelToken;  // Expected: HttpContext.RequestAborted for a given Client.
@@ -129,7 +129,7 @@ public class Room: IServerMessaging {
     public async Task<bool> AddGameAsync(string gameName, WebSocket socket, CancellationToken ct) {
         await clientUpdateSemaphore.WaitAsync();
 
-        if (game.socket != null && game.socket.State == WebSocketState.Open) {
+        if (!game.closeCalled && game.socket != null && game.socket.State == WebSocketState.Open) {
             clientUpdateSemaphore.Release();
             return false;
         }
@@ -465,6 +465,11 @@ public class Room: IServerMessaging {
                 statusDescription = "Going Away Now";
                 break;
             }
+            catch (ObjectDisposedException) {
+                status = WebSocketCloseStatus.EndpointUnavailable;
+                statusDescription = "No Socket to Send Through";
+                break;
+            }
 
             // For compatibility with some msgpack modules (including the one Harmony uses with TypeScript)
             // where you cannot send excess bits/bytes across the socket without getting an error when decoding.
@@ -516,9 +521,15 @@ public class Room: IServerMessaging {
         Console.WriteLine($"Room {Id} {removed}: Removed Client {client.name} with info {status}, {statusDescription}");
     }
 
-    // Deallocates any non-WebSocket resources that the room needed to function.
-    public void Free() {
-        clientUpdateSemaphore.Dispose();
+    // Deallocates all resources that the room needed to function.
+    public void Dispose() {
+        clientUpdateSemaphore?.Dispose();
+        roomDeletionCancel?.Dispose();
+
+        game.socket?.Dispose();
+        foreach (Client client in clientMap.Values) {
+            client.socket?.Dispose();
+        }
     }
 
     /*

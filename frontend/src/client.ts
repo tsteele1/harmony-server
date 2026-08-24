@@ -97,12 +97,11 @@ export class Client {
                 return;
             }
 
-            if (this.retries >= this.maxRetries || this.stopReconnect) {
-                this.close("Unable to Reconnect to Server: Max Retries Reached");
-                return;
-            }
-            else if (this.stopReconnect) {
+            if (this.stopReconnect) {
                 this.close("Manual Disconnect");
+            }
+            else if (this.retries >= this.maxRetries || this.stopReconnect) {
+                this.close("Unable to Reconnect to Server: Max Retries Reached");
                 return;
             }
 

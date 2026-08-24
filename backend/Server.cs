@@ -332,7 +332,7 @@ public class Server {
 
         // Cuts out redundant processes from doing this again soon.
         room.CloseRoomDeletion();
-        room.Free();
+        room.Dispose();
 
         Console.WriteLine($"Removed Room {roomCode}: {success}");
         return success;
